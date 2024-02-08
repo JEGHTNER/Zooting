@@ -5,23 +5,21 @@
       @read-message = "readMessage"
     />
     <Ready />
-<!--    <MatchingCompleteModal v-if="isMatchingComplete" class="z-40"/>-->
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
+import { useRouter } from "vue-router"
 import { useAccessTokenStore } from "@/stores/store"
 import Social from '../components/home/Social.vue'
 import Ready from '../components/home/Ready.vue'
 const { VITE_SERVER_API_URL } = import.meta.env
 
 const store = useAccessTokenStore()
+const router = useRouter()
 
 const userInfo = ref(store.userInfo)
-
-// 매칭이 된 경우
-const isMatchingComplete = ref(true)
 
 const socket = new SockJS(`${VITE_SERVER_API_URL}/ws/dm`)
 const stompClient = Stomp.over(socket)
@@ -33,15 +31,12 @@ watch(()=> store.userInfo, (UpdateUser)=>{
 })
 
 onMounted(async () => {
-  if (!store.isCompletedSignUp) {
-    store.checkCompletedSignUp()
+  const result = await store.checkCompletedSignUp()
+  if (result === 'USER') {
+    store.getUserInfo()
+    // 소켓 연결 요청을 여기서 하니까 요청을 보내지 않음. why??
   }
 })
-
-const readMessage = (sender: string) => {
-  const index = newSender.value.indexOf(sender)
-  newSender.value.splice(index, 1)
-}
 
 // 소켓 통신 연결 요청
 stompClient.connect(
@@ -55,20 +50,24 @@ stompClient.connect(
   }
 )
 
+const readMessage = (sender: string) => {
+  const index = newSender.value.indexOf(sender)
+  newSender.value.splice(index, 1)
+}
+
+
 // 연결 해제 시 호출
 socket.onclose = () => {
     console.log('Disconnected from WebSocket')
 }
 
 const onConnected = () => {
-  stompClient.subscribe(`/api/sub/dm/${userInfo.value.email}`,
+  stompClient.subscribe(`/api/sub/dm/${userInfo.value?.email}`,
   (message: any) => {
     const dmReq = JSON.parse(message.body)
     console.log('Received DM:', dmReq.value)
 
     newSender.value.push(dmReq.sender)
-    // 만약 탭이 열려 있으면 메시지 보여줌 emit
-    // 닫혀 있는 애들한테는 알림 표시 - props V
   })
 }
 </script>
