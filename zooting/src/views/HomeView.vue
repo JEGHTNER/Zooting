@@ -14,6 +14,7 @@
 <script setup lang="ts">
 import {onMounted, ref, watch} from 'vue'
 import {useAccessTokenStore, useStore} from "@/stores/store"
+import { onBeforeRouteLeave } from 'vue-router'
 import TheSideBar from '@/components/TheSideBar.vue'
 import Social from '@/components/home/Social.vue'
 import Ready from '@/components/home/Ready.vue'
@@ -21,7 +22,7 @@ import DmSound from '/assets/sounds/dm.mp3'
 const { VITE_SERVER_API_URL} = import.meta.env
 
 const store = useAccessTokenStore()
-const dmStore = useStore()
+const persistStore = useStore()
 
 const userInfo = ref(store.userInfo)
 
@@ -59,6 +60,11 @@ onMounted(async () => {
     await store.getUserInfo()
   }
   startHeartbeat();
+
+  // 매칭 중에 새로고침했을 시 매칭 취소
+  if (localStorage.getItem("sessionRoomId")) {
+    store.meetingExit()
+  }
 })
 
 const startHeartbeat = () => {
@@ -100,7 +106,7 @@ const onConnected = () => {
         dmRes.value = { ...res, createdAt: new Date(time).toLocaleTimeString('ko-KR', {timeStyle: 'short', hour12: false}) }
       } else {
         // 새로운 메시지 알림
-        dmStore.newMessage.push(res.sender)
+        persistStore.newMessage.push(res.sender)
         playSound(dmSound)
       } 
     } 
@@ -111,7 +117,6 @@ const onConnected = () => {
     }
     // 매칭 수락
     else if (type === 'OPENVIDU') {
-      // 1970년 1월 1일 00:00:00 UTC로부터 지난 시간을 밀리초로 변환
       store.pushMeetingRoom(res, Date.parse(time))
       store.isRequesting = false
     }
